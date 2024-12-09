@@ -1,6 +1,6 @@
 {
   "name": "@bhammond/react-stateful",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "main": "src/index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
@@ -10,11 +10,8 @@
   "license": "SEE LICENSE IN LICENSE",
   "description": "A Signal and Querystate backed React State management utility library.",
   "devDependencies": {
-    "@testing-library/react": "^16.1.0",
-    "@testing-library/user-event": "^14.5.2",
     "@types/react": "^19.0.1",
     "@types/react-dom": "^19.0.2",
-    "jest": "^29.7.0",
     "typescript": "^5.7.2"
   },
   "repository": {
@@ -24,5 +21,8 @@
   "bugs": {
     "url": "https://github.com/BenAHammond/react-stateful/issues"
   },
-  "homepage": "https://github.com/BenAHammond/react-stateful#readme"
+  "homepage": "https://github.com/BenAHammond/react-stateful#readme",
+  "peerDependencies": {
+    "react": "^16 || ^17 || ^18 || ^19"
+  }
 }
