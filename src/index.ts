@@ -58,21 +58,21 @@ function useQueryState<T extends ParamValue>(
   queryKey?: string
 ): [T, (newValue: T | ((prev: T) => T)) => void] {
   const key = encodeURIComponent(queryKey ?? defaultValue?.toString() ?? '');
-  const signalRef = useRef(getOrCreateSignal(key, defaultValue));
+  
+  // Initialize with value from URL if it exists
+  const initialValue = typeof window !== 'undefined'
+    ? parseValue(new URLSearchParams(window.location.search).get(key), defaultValue) ?? defaultValue
+    : defaultValue;
+  
+  const signalRef = useRef(getOrCreateSignal(key, initialValue));
   const [value, setValue] = useState<T>(signalRef.current.value);
 
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const urlValue = parseValue(params.get(key), defaultValue);
-    if (urlValue !== null) {
-      signalRef.current.value = urlValue as T;
-    }
-  }, [key, defaultValue]);
-
+  // Subscribe to signal changes
   useEffect(() => {
     return signalRef.current.subscribe(setValue);
   }, []);
 
+  // Update handler
   const setQueryValue = useCallback((newValue: T | ((prev: T) => T)) => {
     const nextValue = typeof newValue === 'function' 
       ? (newValue as (prev: T) => T)(signalRef.current.value)
@@ -94,6 +94,7 @@ function useQueryState<T extends ParamValue>(
     );
   }, [key]);
 
+  // Handle browser navigation
   useEffect(() => {
     const handleUrlChange = () => {
       const params = new URLSearchParams(window.location.search);
@@ -109,4 +110,5 @@ function useQueryState<T extends ParamValue>(
 
   return [value, setQueryValue];
 }
+
 export default useQueryState;
