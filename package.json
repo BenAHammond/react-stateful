@@ -1,9 +1,9 @@
 {
   "name": "@bhammond/react-stateful",
   "version": "1.0.1",
-  "main": "src/index.js",
+  "main": "dist/index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "prepublish": "npx tsc"
   },
   "keywords": [],
   "author": "Ben Hammond",
@@ -24,5 +24,8 @@
   "homepage": "https://github.com/BenAHammond/react-stateful#readme",
   "peerDependencies": {
     "react": "^16 || ^17 || ^18 || ^19"
+  },
+  "dependencies": {
+    "csstype": "^3.1.3"
   }
 }
