@@ -25,11 +25,23 @@ yarn add @bhammond/react-stateful
 
 ## Basic Usage
 
-```typescript
-import { useQueryState } from '@bhammond/react-stateful';
+### JavaScript
 
-function MyComponent() {
-  const [value, setValue] = useQueryState(false, 'showDialog');
+```javascript
+import { useQueryState } from '@bhammond/react-stateful';
+import { useSearchParams } from 'next/navigation';
+
+// In your Server Component
+export default function Page() {
+  const searchParams = useSearchParams();
+  const serverParams = Object.fromEntries(searchParams.entries());
+  
+  return <MyClientComponent serverParams={serverParams} />;
+}
+
+// In your Client Component
+function MyClientComponent({ serverParams }) {
+  const [value, setValue] = useQueryState(false, serverParams, 'showDialog');
 
   return (
     <button onClick={() => setValue(!value)}>
@@ -39,15 +51,17 @@ function MyComponent() {
 }
 ```
 
-## Advanced Usage
-
-### With Server-Side Parameters (Next.js)
+### TypeScript
 
 ```typescript
-// app/page.tsx (Server Component)
+import { useQueryState } from '@bhammond/react-stateful';
 import { useSearchParams } from 'next/navigation';
-import MyClientComponent from './my-client-component';
 
+interface ServerProps {
+  serverParams: Record<string, string>;
+}
+
+// In your Server Component
 export default function Page() {
   const searchParams = useSearchParams();
   const serverParams = Object.fromEntries(searchParams.entries());
@@ -55,63 +69,14 @@ export default function Page() {
   return <MyClientComponent serverParams={serverParams} />;
 }
 
-// my-client-component.tsx (Client Component)
-'use client';
-
-import { useQueryState } from '@bhammond/react-stateful';
-
-function MyClientComponent({ serverParams }) {
-  const [value, setValue] = useQueryState(false, 'showDialog', { serverParams });
-  // ...
-}
-```
-
-### Sharing State Between Components
-
-```typescript
-function ComponentA() {
-  const [count, setCount] = useQueryState(0, 'counter');
-  return <button onClick={() => setCount(c => c + 1)}>Increment: {count}</button>;
-}
-
-function ComponentB() {
-  const [count, setCount] = useQueryState(0, 'counter');
-  return <div>Current count: {count}</div>;
-}
-```
-
-### Working with Objects
-
-```typescript
-interface Filter {
-  category: string;
-  sort: 'asc' | 'desc';
-}
-
-function FilterComponent() {
-  const [filters, setFilters] = useQueryState<Filter>(
-    { category: 'all', sort: 'asc' },
-    'filters'
-  );
+// In your Client Component
+function MyClientComponent({ serverParams }: ServerProps) {
+  const [value, setValue] = useQueryState<boolean>(false, serverParams, 'showDialog');
 
   return (
-    <div>
-      <select
-        value={filters.category}
-        onChange={e => setFilters({ ...filters, category: e.target.value })}
-      >
-        <option value="all">All</option>
-        <option value="active">Active</option>
-      </select>
-      <button
-        onClick={() => setFilters(f => ({ 
-          ...f, 
-          sort: f.sort === 'asc' ? 'desc' : 'asc' 
-        }))}
-      >
-        Toggle Sort
-      </button>
-    </div>
+    <button onClick={() => setValue(!value)}>
+      {value ? 'Hide' : 'Show'} Dialog
+    </button>
   );
 }
 ```
@@ -123,46 +88,98 @@ function FilterComponent() {
 ```typescript
 function useQueryState<T>(
   defaultValue: T,
-  queryKey?: string,
-  config?: {
-    serverParams?: Record<string, string>;
-  }
-): [T, (newValue: T | ((prev: T) => T)) => void]
+  serverParams: Record<string, string>,
+  queryKey?: string
+): [T, (newValue: T | ((prev: T) => T)) => T]
 ```
 
 #### Parameters
 
-- `defaultValue: T` - Initial value for the state
+- `defaultValue: T` - Initial value for the state if not found in URL parameters
+- `serverParams: Record<string, string>` - URL parameters from server-side rendering
 - `queryKey?: string` - URL parameter key (optional, defaults to stringified defaultValue)
-- `config?: Object` - Configuration options
-  - `serverParams?: Record<string, string>` - Initial parameters from server-side rendering
 
 #### Returns
 
 - `[value, setValue]` - A tuple containing the current value and setter function
 
-#### Supported Types
+## Usage with Different Frameworks
 
-- Primitives (string, number, boolean)
-- Objects (automatically serialized/deserialized)
-- Arrays
-- null
+### Next.js (App Router)
 
-## Notes
+```javascript
+// JavaScript
+// app/page.js (Server Component)
+import { useSearchParams } from 'next/navigation';
+import FilterPanel from './filter-panel';
 
-- The hook automatically handles URL encoding/decoding
-- URL parameters are removed when the value is `null` or `false`
-- Objects are automatically serialized to JSON in the URL
-- Browser history is preserved and works with forward/back navigation
-- State is shared between all instances using the same key
+export default function Page() {
+  const searchParams = useSearchParams();
+  const serverParams = Object.fromEntries(searchParams.entries());
+  
+  return <FilterPanel serverParams={serverParams} />;
+}
+
+// filter-panel.js (Client Component)
+'use client';
+
+function FilterPanel({ serverParams }) {
+  const [filters, setFilters] = useQueryState(
+    {
+      search: '',
+      category: 'all',
+      sortBy: 'date',
+      page: 1
+    },
+    serverParams,
+    'filters'
+  );
+
+  // ... rest of the component
+}
+```
+
+```typescript
+// TypeScript
+interface Filters {
+  search: string;
+  category: string;
+  sortBy: string;
+  page: number;
+}
+
+interface ServerProps {
+  serverParams: Record<string, string>;
+}
+
+// filter-panel.tsx (Client Component)
+'use client';
+
+function FilterPanel({ serverParams }: ServerProps) {
+  const [filters, setFilters] = useQueryState<Filters>(
+    {
+      search: '',
+      category: 'all',
+      sortBy: 'date',
+      page: 1
+    },
+    serverParams,
+    'filters'
+  );
+
+  // ... rest of the component
+}
+```
 
 ## Examples
 
 ### Form State
 
-```typescript
-function SearchForm() {
-  const [query, setQuery] = useQueryState('', 'q');
+#### JavaScript
+
+```javascript
+function SearchForm({ serverParams }) {
+  const [query, setQuery] = useQueryState('', serverParams, 'q');
   
   return (
     <form onSubmit={e => e.preventDefault()}>
@@ -177,23 +194,73 @@ function SearchForm() {
 }
 ```
 
-### Pagination
+#### TypeScript
 
 ```typescript
-function Pagination() {
-  const [page, setPage] = useQueryState(1, 'page');
+interface SearchFormProps {
+  serverParams: Record<string, string>;
+}
+
+function SearchForm({ serverParams }: SearchFormProps) {
+  const [query, setQuery] = useQueryState<string>('', serverParams, 'q');
   
   return (
-    <div>
-      <button onClick={() => setPage(p => Math.max(1, p - 1))}>Previous</button>
-      <span>Page {page}</span>
-      <button onClick={() => setPage(p => p + 1)}>Next</button>
-    </div>
+    <form onSubmit={e => e.preventDefault()}>
+      <input
+        value={query}
+        onChange={e => setQuery(e.target.value)}
+        placeholder="Search..."
+      />
+      <button onClick={() => setQuery('')}>Clear</button>
+    </form>
   );
 }
 ```
 
 ### Complex Filters
+
+#### JavaScript
+
+```javascript
+function FilterPanel({ serverParams }) {
+  const [filters, setFilters] = useQueryState(
+    {
+      search: '',
+      category: 'all',
+      sortBy: 'date',
+      page: 1
+    },
+    serverParams,
+    'filters'
+  );
+
+  const updateFilter = (key, value) => {
+    setFilters(current => ({
+      ...current,
+      [key]: value,
+      page: key === 'page' ? value : 1 // Reset page when other filters change
+    }));
+  };
+
+  return (
+    <div>
+      <input
+        value={filters.search}
+        onChange={e => updateFilter('search', e.target.value)}
+      />
+      <select
+        value={filters.category}
+        onChange={e => updateFilter('category', e.target.value)}
+      >
+        {/* options */}
+      </select>
+      {/* ... other filter controls */}
+    </div>
+  );
+}
+```
+
+#### TypeScript
 
 ```typescript
 interface Filters {
@@ -203,15 +270,23 @@ interface Filters {
   page: number;
 }
 
-function FilterPanel() {
-  const [filters, setFilters] = useQueryState<Filters>({
-    search: '',
-    category: 'all',
-    sortBy: 'date',
-    page: 1
-  }, 'filters');
+interface FilterPanelProps {
+  serverParams: Record<string, string>;
+}
 
-  const updateFilter = (key: keyof Filters, value: any) => {
+function FilterPanel({ serverParams }: FilterPanelProps) {
+  const [filters, setFilters] = useQueryState<Filters>(
+    {
+      search: '',
+      category: 'all',
+      sortBy: 'date',
+      page: 1
+    },
+    serverParams,
+    'filters'
+  );
+
+  const updateFilter = (key: keyof Filters, value: Filters[keyof Filters]) => {
     setFilters(current => ({
       ...current,
       [key]: value,

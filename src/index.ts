@@ -2,10 +2,6 @@ import { useState, useCallback, useEffect, useDebugValue, useRef } from 'react';
 
 type ParamValue = any;
 
-interface UseQueryStateConfig {
-  serverParams?: Record<string, string>;
-}
-
 class Signal<T> {
   private subscribers = new Set<(value: T) => void>();
   private currentValue: T;
@@ -59,11 +55,10 @@ const stringifyValue = (value: ParamValue): string => {
 
 function useQueryState<T extends ParamValue>(
   defaultValue: T,
+  serverParams: Record<string, string>,
   queryKey?: string,
-  config: UseQueryStateConfig = {}
 ): [T, (newValue: T | ((prev: T) => T)) => void] {
   const key = encodeURIComponent(queryKey ?? defaultValue?.toString() ?? '');
-  const { serverParams = {} } = config;
 
   // Initialize with server params or default value
   const initialValue = parseValue(serverParams[key], defaultValue) ?? defaultValue;
