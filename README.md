@@ -1,15 +1,17 @@
 # @bhammond/react-stateful
 
-A lightweight, type-safe React hook for managing state with URL parameters and cross-component synchronization.
+A lightweight React hook for syncing URL search parameters with state, built for modern React applications. Zero dependencies, pure React, and seamless handling of both client and server-side rendering while maintaining URL state across page loads and navigation.
 
 ## Features
 
-- 🔄 Synchronizes state with URL parameters automatically
+- 🔄 Full SSR compatibility with zero hydration issues
+- ⚛️ Framework-agnostic with first-class Next.js support
+- 🌐 Works with any URLSearchParams-like interface
 - 🤝 Shares state between components using the same key
-- 🌐 Works with browser navigation (back/forward)
+- 🧭 Handles browser navigation (back/forward) automatically
 - 📦 TypeScript support out of the box
-- ⚡️ Zero dependencies
-- 🔒 SSR-safe with server-side parameter support
+- ⚡️ Zero dependencies - just React
+- 🪶 Tiny bundle size (~1KB minified + gzipped)
 
 ## Installation
 
@@ -25,58 +27,77 @@ yarn add @bhammond/react-stateful
 
 ## Basic Usage
 
-### JavaScript
+### React with URLSearchParams
 
-```javascript
+```typescript
 import { useQueryState } from '@bhammond/react-stateful';
-import { useSearchParams } from 'next/navigation';
 
-// In your Server Component
-export default function Page() {
-  const searchParams = useSearchParams();
-  const serverParams = Object.fromEntries(searchParams.entries());
-  
-  return <MyClientComponent serverParams={serverParams} />;
-}
-
-// In your Client Component
-function MyClientComponent({ serverParams }) {
-  const [value, setValue] = useQueryState(false, serverParams, 'showDialog');
+function SearchComponent() {
+  // Use the built-in URLSearchParams
+  const searchParams = new URLSearchParams(window.location.search);
+  const [query, setQuery] = useQueryState('q', searchParams);
 
   return (
-    <button onClick={() => setValue(!value)}>
-      {value ? 'Hide' : 'Show'} Dialog
-    </button>
+    <input
+      value={query ?? ''}
+      onChange={(e) => setQuery(e.target.value)}
+      placeholder="Search..."
+    />
   );
 }
 ```
 
-### TypeScript
+### Next.js App Router
 
 ```typescript
+// app/page.tsx
+import { SearchParams } from 'next/navigation';
+import SearchComponent from './search-component';
+
+export default async function Page({
+  searchParams
+}: {
+  searchParams: SearchParams
+}) {
+  return <SearchComponent searchParams={searchParams} />;
+}
+
+// app/search-component.tsx
+'use client';
+
 import { useQueryState } from '@bhammond/react-stateful';
-import { useSearchParams } from 'next/navigation';
 
-interface ServerProps {
-  serverParams: Record<string, string>;
-}
-
-// In your Server Component
-export default function Page() {
-  const searchParams = useSearchParams();
-  const serverParams = Object.fromEntries(searchParams.entries());
-  
-  return <MyClientComponent serverParams={serverParams} />;
-}
-
-// In your Client Component
-function MyClientComponent({ serverParams }: ServerProps) {
-  const [value, setValue] = useQueryState<boolean>(false, serverParams, 'showDialog');
+export default function SearchComponent({ searchParams }) {
+  const [query, setQuery] = useQueryState('q', searchParams);
 
   return (
-    <button onClick={() => setValue(!value)}>
-      {value ? 'Hide' : 'Show'} Dialog
-    </button>
+    <input
+      value={query ?? ''}
+      onChange={(e) => setQuery(e.target.value)}
+      placeholder="Search..."
+    />
+  );
+}
+```
+
+### Using useSearchParams Hook (Next.js)
+
+```typescript
+'use client';
+
+import { useSearchParams } from 'next/navigation';
+import { useQueryState } from '@bhammond/react-stateful';
+
+export default function SearchComponent() {
+  const searchParams = useSearchParams();
+  const [query, setQuery] = useQueryState('q', searchParams);
+
+  return (
+    <input
+      value={query ?? ''}
+      onChange={(e) => setQuery(e.target.value)}
+      placeholder="Search..."
+    />
   );
 }
 ```
@@ -86,105 +107,41 @@ function MyClientComponent({ serverParams }: ServerProps) {
 ### useQueryState
 
 ```typescript
-function useQueryState<T>(
-  defaultValue: T,
-  serverParams: Record<string, string>,
-  queryKey?: string
-): [T, (newValue: T | ((prev: T) => T)) => T]
+function useQueryState<T = string>(
+  name: string,
+  searchParams: SearchParamsInput,
+  defaultValue?: T
+): [T, (newValue: T | ((prev: T) => T)) => void]
 ```
 
 #### Parameters
 
-- `defaultValue: T` - Initial value for the state if not found in URL parameters
-- `serverParams: Record<string, string>` - URL parameters from server-side rendering
-- `queryKey?: string` - URL parameter key (optional, defaults to stringified defaultValue)
+- `name: string` - URL parameter key
+- `searchParams` - Any object that either:
+  - Implements `get(key: string): string | null` (like URLSearchParams)
+  - Is a plain object with string values
+- `defaultValue?: T` - Optional default value when parameter is not present
 
 #### Returns
 
 - `[value, setValue]` - A tuple containing the current value and setter function
 
-## Usage with Different Frameworks
+#### Type Parameters
 
-### Next.js (App Router)
+- `T` - The type of the state value (defaults to string)
 
-```javascript
-// JavaScript
-// app/page.js (Server Component)
-import { useSearchParams } from 'next/navigation';
-import FilterPanel from './filter-panel';
+## Advanced Examples
 
-export default function Page() {
-  const searchParams = useSearchParams();
-  const serverParams = Object.fromEntries(searchParams.entries());
-  
-  return <FilterPanel serverParams={serverParams} />;
-}
-
-// filter-panel.js (Client Component)
-'use client';
-
-function FilterPanel({ serverParams }) {
-  const [filters, setFilters] = useQueryState(
-    {
-      search: '',
-      category: 'all',
-      sortBy: 'date',
-      page: 1
-    },
-    serverParams,
-    'filters'
-  );
-
-  // ... rest of the component
-}
-```
+### With Default Value
 
 ```typescript
-// TypeScript
-interface Filters {
-  search: string;
-  category: string;
-  sortBy: string;
-  page: number;
-}
-
-interface ServerProps {
-  serverParams: Record<string, string>;
-}
-
-// filter-panel.tsx (Client Component)
-'use client';
-
-function FilterPanel({ serverParams }: ServerProps) {
-  const [filters, setFilters] = useQueryState<Filters>(
-    {
-      search: '',
-      category: 'all',
-      sortBy: 'date',
-      page: 1
-    },
-    serverParams,
-    'filters'
-  );
-
-  // ... rest of the component
-}
-```
-
-## Examples
-
-### Form State
-
-#### JavaScript
-
-```javascript
-function SearchForm({ serverParams }) {
-  const [query, setQuery] = useQueryState('', serverParams, 'q');
+function SearchForm({ searchParams }) {
+  const [query, setQuery] = useQueryState('q', searchParams, '');
   
   return (
     <form onSubmit={e => e.preventDefault()}>
       <input
-        value={query}
+        value={query}  // No need to check for null
         onChange={e => setQuery(e.target.value)}
         placeholder="Search..."
       />
@@ -194,73 +151,7 @@ function SearchForm({ serverParams }) {
 }
 ```
 
-#### TypeScript
-
-```typescript
-interface SearchFormProps {
-  serverParams: Record<string, string>;
-}
-
-function SearchForm({ serverParams }: SearchFormProps) {
-  const [query, setQuery] = useQueryState<string>('', serverParams, 'q');
-  
-  return (
-    <form onSubmit={e => e.preventDefault()}>
-      <input
-        value={query}
-        onChange={e => setQuery(e.target.value)}
-        placeholder="Search..."
-      />
-      <button onClick={() => setQuery('')}>Clear</button>
-    </form>
-  );
-}
-```
-
-### Complex Filters
-
-#### JavaScript
-
-```javascript
-function FilterPanel({ serverParams }) {
-  const [filters, setFilters] = useQueryState(
-    {
-      search: '',
-      category: 'all',
-      sortBy: 'date',
-      page: 1
-    },
-    serverParams,
-    'filters'
-  );
-
-  const updateFilter = (key, value) => {
-    setFilters(current => ({
-      ...current,
-      [key]: value,
-      page: key === 'page' ? value : 1 // Reset page when other filters change
-    }));
-  };
-
-  return (
-    <div>
-      <input
-        value={filters.search}
-        onChange={e => updateFilter('search', e.target.value)}
-      />
-      <select
-        value={filters.category}
-        onChange={e => updateFilter('category', e.target.value)}
-      >
-        {/* options */}
-      </select>
-      {/* ... other filter controls */}
-    </div>
-  );
-}
-```
-
-#### TypeScript
+### Complex Objects
 
 ```typescript
 interface Filters {
@@ -270,20 +161,18 @@ interface Filters {
   page: number;
 }
 
-interface FilterPanelProps {
-  serverParams: Record<string, string>;
-}
+const DEFAULT_FILTERS: Filters = {
+  search: '',
+  category: 'all',
+  sortBy: 'date',
+  page: 1
+};
 
-function FilterPanel({ serverParams }: FilterPanelProps) {
+function FilterPanel({ searchParams }) {
   const [filters, setFilters] = useQueryState<Filters>(
-    {
-      search: '',
-      category: 'all',
-      sortBy: 'date',
-      page: 1
-    },
-    serverParams,
-    'filters'
+    'filters',
+    searchParams,
+    DEFAULT_FILTERS
   );
 
   const updateFilter = (key: keyof Filters, value: Filters[keyof Filters]) => {
@@ -306,11 +195,38 @@ function FilterPanel({ serverParams }: FilterPanelProps) {
       >
         {/* options */}
       </select>
-      {/* ... other filter controls */}
     </div>
   );
 }
 ```
+
+### Sharing State Between Components
+
+```typescript
+function SearchInput({ searchParams }) {
+  const [query, setQuery] = useQueryState('q', searchParams);
+  return <input value={query ?? ''} onChange={e => setQuery(e.target.value)} />;
+}
+
+function SearchResults({ searchParams }) {
+  const [query] = useQueryState('q', searchParams);
+  return <div>Results for: {query}</div>;
+}
+
+function SearchPage({ searchParams }) {
+  return (
+    <div>
+      <SearchInput searchParams={searchParams} />
+      <SearchResults searchParams={searchParams} />
+    </div>
+  );
+}
+```
+
+## Browser Support
+
+- Modern browsers that support URLSearchParams and History API
+- No IE11 support
 
 ## License
 

@@ -1,6 +1,20 @@
 import { useState, useCallback, useEffect, useDebugValue, useRef } from 'react';
 
-type ParamValue = any;
+// Generic interface that matches URLSearchParams-like objects
+interface SearchParamsLike {
+  get(key: string): string | null;
+  entries(): IterableIterator<[string, string]>;
+}
+
+type SearchParamsInput = SearchParamsLike | Record<string, string>;
+
+// Helper to normalize different searchParams types
+const getParamValue = (params: SearchParamsInput, key: string): string | null => {
+  if ('get' in params && typeof params.get === 'function') {
+    return params.get(key);
+  }
+  return params[key] ?? null;
+};
 
 class Signal<T> {
   private subscribers = new Set<(value: T) => void>();
@@ -34,45 +48,37 @@ const getOrCreateSignal = <T>(key: string, initialValue: T): Signal<T> => {
   return signalStore.get(key)!;
 };
 
-const parseValue = (value: string | null, defaultValue: ParamValue): ParamValue => {
-  if (value === null) return null;
+const parseValue = (value: string | null, defaultValue?: any): any => {
+  if (value === null) return defaultValue ?? null;
   const decoded = decodeURIComponent(value);
   try {
-    return typeof defaultValue === 'object' ? 
-      JSON.parse(decoded) : 
-      decoded === 'true' ? true :
-      decoded === 'false' ? false :
-      !isNaN(Number(decoded)) ? Number(decoded) :
-      decoded;
+    return JSON.parse(decoded);
   } catch {
     return decoded;
   }
 };
 
-const stringifyValue = (value: ParamValue): string => {
+const stringifyValue = (value: any): string => {
   return typeof value === 'object' ? JSON.stringify(value) : String(value);
 };
 
-function useQueryState<T extends ParamValue>(
-  defaultValue: T,
-  serverParams: Record<string, string>,
-  queryKey?: string,
+function useQueryState<T = string>(
+  name: string,
+  searchParams: SearchParamsInput,
+  defaultValue?: T
 ): [T, (newValue: T | ((prev: T) => T)) => void] {
-  const key = encodeURIComponent(queryKey ?? defaultValue?.toString() ?? '');
-
-  // Initialize with server params or default value
-  const initialValue = parseValue(serverParams[key], defaultValue) ?? defaultValue;
+  const key = encodeURIComponent(name);
   
-  const signalRef = useRef(getOrCreateSignal(key, initialValue));
+  // Initialize with search params or default value
+  const initialValue = parseValue(getParamValue(searchParams, key), defaultValue);
+  const signalRef = useRef(getOrCreateSignal<T>(key, initialValue));
   const [value, setValue] = useState<T>(signalRef.current.value);
 
   // Only sync with browser URL after initial mount
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const urlValue = parseValue(params.get(key), defaultValue);
-    if (urlValue !== null) {
-      signalRef.current.value = urlValue as T;
-    }
+    signalRef.current.value = urlValue;
   }, []);
 
   useEffect(() => {
@@ -104,7 +110,7 @@ function useQueryState<T extends ParamValue>(
     const handleUrlChange = () => {
       const params = new URLSearchParams(window.location.search);
       const urlValue = parseValue(params.get(key), defaultValue);
-      signalRef.current.value = urlValue !== null ? urlValue as T : defaultValue;
+      signalRef.current.value = urlValue;
     };
 
     window.addEventListener('popstate', handleUrlChange);
