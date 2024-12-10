@@ -1,12 +1,12 @@
 # @bhammond/react-stateful
 
-A lightweight React hook for syncing URL search parameters with state, built for modern React applications. Zero dependencies, pure React, and seamless handling of both client and server-side rendering while maintaining URL state across page loads and navigation.
+A lightweight React hook for syncing URL search parameters with state, built specifically for Next.js and other SSR frameworks. Zero dependencies, pure React, and seamless handling of both client and server-side rendering while maintaining URL state across page loads and navigation.
 
 ## Features
 
+- ⚛️ First-class Next.js App Router support
 - 🔄 Full SSR compatibility with zero hydration issues
-- ⚛️ Framework-agnostic with first-class Next.js support
-- 🌐 Works with any URLSearchParams-like interface
+- 🌐 Works with `searchParams` prop and `useSearchParams` hook
 - 🤝 Shares state between components using the same key
 - 🧭 Handles browser navigation (back/forward) automatically
 - 📦 TypeScript support out of the box
@@ -34,8 +34,8 @@ import { useQueryState } from '@bhammond/react-stateful';
 
 function SearchComponent() {
   // Use the built-in URLSearchParams
-  const searchParams = new URLSearchParams(window.location.search);
-  const [query, setQuery] = useQueryState('q', searchParams);
+  const params = new URLSearchParams(window.location.search);
+  const [query, setQuery] = useQueryState('q', params);
 
   return (
     <input
@@ -51,15 +51,15 @@ function SearchComponent() {
 
 ```typescript
 // app/page.tsx
-import { SearchParams } from 'next/navigation';
-import SearchComponent from './search-component';
-
 export default async function Page({
-  searchParams
+  searchParams,
 }: {
-  searchParams: SearchParams
+  searchParams: { [key: string]: string | string[] | undefined };
 }) {
-  return <SearchComponent searchParams={searchParams} />;
+  // Important: In Next.js 15+, you must await params
+  const params = await Promise.resolve(searchParams);
+  
+  return <SearchComponent params={params} />;
 }
 
 // app/search-component.tsx
@@ -67,8 +67,12 @@ export default async function Page({
 
 import { useQueryState } from '@bhammond/react-stateful';
 
-export default function SearchComponent({ searchParams }) {
-  const [query, setQuery] = useQueryState('q', searchParams);
+export default function SearchComponent({ 
+  params 
+}: { 
+  params: { [key: string]: string | string[] | undefined } 
+}) {
+  const [query, setQuery] = useQueryState('q', params);
 
   return (
     <input
@@ -80,7 +84,7 @@ export default function SearchComponent({ searchParams }) {
 }
 ```
 
-### Using useSearchParams Hook (Next.js)
+### Using useSearchParams (Client Components)
 
 ```typescript
 'use client';
@@ -90,7 +94,9 @@ import { useQueryState } from '@bhammond/react-stateful';
 
 export default function SearchComponent() {
   const searchParams = useSearchParams();
-  const [query, setQuery] = useQueryState('q', searchParams);
+  // Important: In Next.js 15+, you must await params
+  const params = await Promise.resolve(searchParams);
+  const [query, setQuery] = useQueryState('q', params);
 
   return (
     <input
@@ -109,7 +115,7 @@ export default function SearchComponent() {
 ```typescript
 function useQueryState<T = string>(
   name: string,
-  searchParams: SearchParamsInput,
+  params: ParamsInput,
   defaultValue?: T
 ): [T, (newValue: T | ((prev: T) => T)) => void]
 ```
@@ -117,9 +123,9 @@ function useQueryState<T = string>(
 #### Parameters
 
 - `name: string` - URL parameter key
-- `searchParams` - Any object that either:
+- `params` - URL parameters object that either:
   - Implements `get(key: string): string | null` (like URLSearchParams)
-  - Is a plain object with string values
+  - Is a plain object with string or string array values
 - `defaultValue?: T` - Optional default value when parameter is not present
 
 #### Returns
@@ -132,16 +138,16 @@ function useQueryState<T = string>(
 
 ## Advanced Examples
 
-### With Default Value
+### Form with Default Value
 
 ```typescript
-function SearchForm({ searchParams }) {
-  const [query, setQuery] = useQueryState('q', searchParams, '');
+function SearchForm({ params }: { params: ParamsInput }) {
+  const [query, setQuery] = useQueryState('q', params, '');
   
   return (
     <form onSubmit={e => e.preventDefault()}>
       <input
-        value={query}  // No need to check for null
+        value={query}
         onChange={e => setQuery(e.target.value)}
         placeholder="Search..."
       />
@@ -168,12 +174,8 @@ const DEFAULT_FILTERS: Filters = {
   page: 1
 };
 
-function FilterPanel({ searchParams }) {
-  const [filters, setFilters] = useQueryState<Filters>(
-    'filters',
-    searchParams,
-    DEFAULT_FILTERS
-  );
+function FilterPanel({ params }: { params: ParamsInput }) {
+  const [filters, setFilters] = useQueryState<Filters>('filters', params, DEFAULT_FILTERS);
 
   const updateFilter = (key: keyof Filters, value: Filters[keyof Filters]) => {
     setFilters(current => ({
@@ -200,24 +202,24 @@ function FilterPanel({ searchParams }) {
 }
 ```
 
-### Sharing State Between Components
+### State Sharing Between Components
 
 ```typescript
-function SearchInput({ searchParams }) {
-  const [query, setQuery] = useQueryState('q', searchParams);
+function SearchInput({ params }: { params: ParamsInput }) {
+  const [query, setQuery] = useQueryState('q', params);
   return <input value={query ?? ''} onChange={e => setQuery(e.target.value)} />;
 }
 
-function SearchResults({ searchParams }) {
-  const [query] = useQueryState('q', searchParams);
+function SearchResults({ params }: { params: ParamsInput }) {
+  const [query] = useQueryState('q', params);
   return <div>Results for: {query}</div>;
 }
 
-function SearchPage({ searchParams }) {
+function SearchPage({ params }: { params: ParamsInput }) {
   return (
     <div>
-      <SearchInput searchParams={searchParams} />
-      <SearchResults searchParams={searchParams} />
+      <SearchInput params={params} />
+      <SearchResults params={params} />
     </div>
   );
 }
@@ -225,8 +227,23 @@ function SearchPage({ searchParams }) {
 
 ## Browser Support
 
-- Modern browsers that support URLSearchParams and History API
+- Modern browsers with URLSearchParams and History API support
 - No IE11 support
+
+## TypeScript Support
+
+Built with TypeScript and includes type definitions out of the box. Supports strict mode and provides full type inference for state values.
+
+## Performance
+
+- Tiny bundle size
+- Efficient URL updates batched with RAF
+- Shared state management without additional re-renders
+- Zero dependencies
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## License
 

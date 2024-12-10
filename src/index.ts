@@ -8,10 +8,97 @@ interface RecordParams {
   [key: string]: string | string[] | undefined;
 }
 
-type SearchParamsInput = URLParamsLike | RecordParams;
+type ParamsInput = URLParamsLike | RecordParams;
 
-function isURLParamsLike(params: SearchParamsInput): params is URLParamsLike {
+// Type checking utilities
+function isNumber(value: any): value is number {
+  return typeof value === 'number' && !isNaN(value);
+}
+
+function isBoolean(value: any): value is boolean {
+  return typeof value === 'boolean';
+}
+
+function isObject(value: any): value is object {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function isArray(value: any): value is any[] {
+  return Array.isArray(value);
+}
+
+// Improved parsing with type checking
+function parseValue<T>(value: string | null, defaultValue?: T): T {
+  try {
+    if (value === null) return defaultValue as T;
+    
+    const decoded = decodeURIComponent(value);
+
+    // Handle different expected types based on defaultValue or type T
+    if (defaultValue !== undefined) {
+      if (isNumber(defaultValue)) {
+        const num = Number(decoded);
+        return isNaN(num) ? defaultValue : num as T;
+      }
+      if (isBoolean(defaultValue)) {
+        return (decoded === 'true' ? true : decoded === 'false' ? false : defaultValue) as T;
+      }
+      if (isObject(defaultValue) || isArray(defaultValue)) {
+        try {
+          const parsed = JSON.parse(decoded);
+          return typeof parsed === typeof defaultValue ? parsed : defaultValue;
+        } catch {
+          return defaultValue;
+        }
+      }
+    }
+
+    // Type inference without defaultValue
+    if (decoded === 'true') return true as T;
+    if (decoded === 'false') return false as T;
+    if (/^\d+$/.test(decoded)) {
+      const num = Number(decoded);
+      return isNaN(num) ? decoded as T : num as T;
+    }
+    if (decoded.startsWith('{') || decoded.startsWith('[')) {
+      try {
+        return JSON.parse(decoded) as T;
+      } catch {
+        return decoded as T;
+      }
+    }
+    
+    return decoded as T;
+  } catch {
+    return defaultValue as T;
+  }
+}
+
+function stringifyValue(value: any): string {
+  try {
+    if (value === null || value === undefined) return '';
+    if (typeof value === 'object') return JSON.stringify(value);
+    return String(value);
+  } catch {
+    return '';
+  }
+}
+
+function isURLParamsLike(params: ParamsInput): params is URLParamsLike {
   return typeof (params as URLParamsLike).get === 'function';
+}
+
+function getParam(params: ParamsInput, key: string): string | null {
+  try {
+    if (isURLParamsLike(params)) {
+      return params.get(key);
+    }
+    const value = params[key];
+    if (Array.isArray(value)) return value[0] ?? null;
+    return value ?? null;
+  } catch {
+    return null;
+  }
 }
 
 class Signal<T> {
@@ -52,48 +139,9 @@ function getSignal<T>(key: string, value: T): Signal<T> {
   return signal;
 }
 
-function getParam(params: SearchParamsInput, key: string): string | null {
-  try {
-    if (isURLParamsLike(params)) {
-      return params.get(key);
-    }
-    const value = params[key];
-    if (Array.isArray(value)) return value[0] ?? null;
-    return value ?? null;
-  } catch {
-    return null;
-  }
-}
-
-function parseValue(value: string | null, defaultValue?: any): any {
-  try {
-    if (value === null) return defaultValue ?? null;
-    const decoded = decodeURIComponent(value);
-    if (decoded === 'true') return true;
-    if (decoded === 'false') return false;
-    if (/^\d+$/.test(decoded)) return Number(decoded);
-    if (decoded.startsWith('{') || decoded.startsWith('[')) {
-      return JSON.parse(decoded);
-    }
-    return decoded;
-  } catch {
-    return defaultValue ?? null;
-  }
-}
-
-function stringifyValue(value: any): string {
-  try {
-    if (value === null || value === undefined) return '';
-    if (typeof value === 'object') return JSON.stringify(value);
-    return String(value);
-  } catch {
-    return '';
-  }
-}
-
 function useQueryState<T = string>(
   name: string,
-  searchParams: SearchParamsInput,
+  params: ParamsInput,
   defaultValue?: T
 ): [T, (newValue: T | ((prev: T) => T)) => void] {
   if (!name) {
@@ -102,7 +150,7 @@ function useQueryState<T = string>(
   }
 
   const key = encodeURIComponent(name);
-  const initialValue = parseValue(getParam(searchParams, key), defaultValue);
+  const initialValue = parseValue<T>(getParam(params, key), defaultValue);
   const signalRef = useRef(getSignal(key, initialValue));
   const [value, setValue] = useState<T>(signalRef.current.value);
 
@@ -111,7 +159,7 @@ function useQueryState<T = string>(
 
     try {
       const params = new URLSearchParams(window.location.search);
-      const urlValue = parseValue(params.get(key), defaultValue);
+      const urlValue = parseValue<T>(params.get(key), defaultValue);
       if (mounted) {
         signalRef.current.notify(urlValue);
       }
@@ -158,7 +206,7 @@ function useQueryState<T = string>(
     function handleUrlChange() {
       try {
         const params = new URLSearchParams(window.location.search);
-        const urlValue = parseValue(params.get(key), defaultValue);
+        const urlValue = parseValue<T>(params.get(key), defaultValue);
         signalRef.current.notify(urlValue);
       } catch (e) {
         console.error('Error handling URL change:', e);
