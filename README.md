@@ -16,33 +16,7 @@ A lightweight React hook for syncing URL search parameters with state, built spe
 ## Installation
 
 ```bash
-npm install @bhammond/react-stateful
-```
-
-or
-
-```bash
-yarn add @bhammond/react-stateful
-```
-
-## Types
-
-### ParamsInput
-The hook accepts two types of parameters:
-
-```typescript
-// 1. URL-like parameters (e.g., URLSearchParams)
-interface URLParamsLike {
-  get(key: string): string | null;
-}
-
-// 2. Record-like parameters (e.g., Next.js searchParams)
-interface RecordParams {
-  [key: string]: string | string[] | undefined;
-}
-
-// Combined type
-type ParamsInput = URLParamsLike | RecordParams;
+npm install --save @bhammond/react-stateful
 ```
 
 ## Basic Usage
