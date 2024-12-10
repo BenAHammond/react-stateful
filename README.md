@@ -25,15 +25,35 @@ or
 yarn add @bhammond/react-stateful
 ```
 
+## Types
+
+### ParamsInput
+The hook accepts two types of parameters:
+
+```typescript
+// 1. URL-like parameters (e.g., URLSearchParams)
+interface URLParamsLike {
+  get(key: string): string | null;
+}
+
+// 2. Record-like parameters (e.g., Next.js searchParams)
+interface RecordParams {
+  [key: string]: string | string[] | undefined;
+}
+
+// Combined type
+type ParamsInput = URLParamsLike | RecordParams;
+```
+
 ## Basic Usage
 
 ### React with URLSearchParams
 
 ```typescript
-import { useQueryState } from '@bhammond/react-stateful';
+import { useQueryState, type URLParamsLike } from '@bhammond/react-stateful';
 
 function SearchComponent() {
-  // Use the built-in URLSearchParams
+  // URLSearchParams implements URLParamsLike
   const params = new URLSearchParams(window.location.search);
   const [query, setQuery] = useQueryState('q', params);
 
@@ -51,10 +71,12 @@ function SearchComponent() {
 
 ```typescript
 // app/page.tsx
+import { type RecordParams } from '@bhammond/react-stateful';
+
 export default async function Page({
   searchParams,
 }: {
-  searchParams: { [key: string]: string | string[] | undefined };
+  searchParams: RecordParams;
 }) {
   // Important: In Next.js 15+, you must await params
   const params = await Promise.resolve(searchParams);
@@ -65,12 +87,12 @@ export default async function Page({
 // app/search-component.tsx
 'use client';
 
-import { useQueryState } from '@bhammond/react-stateful';
+import { useQueryState, type RecordParams } from '@bhammond/react-stateful';
 
 export default function SearchComponent({ 
   params 
 }: { 
-  params: { [key: string]: string | string[] | undefined } 
+  params: RecordParams
 }) {
   const [query, setQuery] = useQueryState('q', params);
 
@@ -90,7 +112,7 @@ export default function SearchComponent({
 'use client';
 
 import { useSearchParams } from 'next/navigation';
-import { useQueryState } from '@bhammond/react-stateful';
+import { useQueryState, type URLParamsLike } from '@bhammond/react-stateful';
 
 export default function SearchComponent() {
   const searchParams = useSearchParams();
@@ -123,9 +145,9 @@ function useQueryState<T = string>(
 #### Parameters
 
 - `name: string` - URL parameter key
-- `params` - URL parameters object that either:
-  - Implements `get(key: string): string | null` (like URLSearchParams)
-  - Is a plain object with string or string array values
+- `params: ParamsInput` - Either:
+  - `URLParamsLike`: An object with a `get(key: string): string | null` method
+  - `RecordParams`: An object with string or string array values
 - `defaultValue?: T` - Optional default value when parameter is not present
 
 #### Returns

@@ -1,14 +1,14 @@
 import { useState, useCallback, useEffect, useDebugValue, useRef } from 'react';
 
-interface URLParamsLike {
+export interface URLParamsLike {
   get(key: string): string | null;
 }
 
-interface RecordParams {
+export interface RecordParams {
   [key: string]: string | string[] | undefined;
 }
 
-type ParamsInput = URLParamsLike | RecordParams;
+export type ParamsInput = URLParamsLike | RecordParams;
 
 // Type checking utilities
 function isNumber(value: any): value is number {
