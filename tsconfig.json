@@ -1,0 +1,11 @@
+{
+  "compilerOptions": {
+    "target": "esnext", // Or a higher target based on your needs
+    "module": "es2015", // Or "es2015" for modern module systems
+    "outDir": "./dist", // Output directory for compiled JavaScript files
+    "declaration": true, // Generate .d.ts declaration files
+    "esModuleInterop": true, // Enable interop between CommonJS and ES modules
+    "forceConsistentCasingInFileNames": true,
+    "moduleResolution": "node"
+  }
+}

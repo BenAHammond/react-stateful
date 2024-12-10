@@ -2,6 +2,10 @@ import { useState, useCallback, useEffect, useDebugValue, useRef } from 'react';
 
 type ParamValue = any;
 
+interface UseQueryStateConfig {
+  serverParams?: Record<string, string>;
+}
+
 class Signal<T> {
   private subscribers = new Set<(value: T) => void>();
   private currentValue: T;
@@ -55,24 +59,31 @@ const stringifyValue = (value: ParamValue): string => {
 
 function useQueryState<T extends ParamValue>(
   defaultValue: T,
-  queryKey?: string
+  queryKey?: string,
+  config: UseQueryStateConfig = {}
 ): [T, (newValue: T | ((prev: T) => T)) => void] {
   const key = encodeURIComponent(queryKey ?? defaultValue?.toString() ?? '');
-  
-  // Initialize with value from URL if it exists
-  const initialValue = typeof window !== 'undefined'
-    ? parseValue(new URLSearchParams(window.location.search).get(key), defaultValue) ?? defaultValue
-    : defaultValue;
+  const { serverParams = {} } = config;
+
+  // Initialize with server params or default value
+  const initialValue = parseValue(serverParams[key], defaultValue) ?? defaultValue;
   
   const signalRef = useRef(getOrCreateSignal(key, initialValue));
   const [value, setValue] = useState<T>(signalRef.current.value);
 
-  // Subscribe to signal changes
+  // Only sync with browser URL after initial mount
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const urlValue = parseValue(params.get(key), defaultValue);
+    if (urlValue !== null) {
+      signalRef.current.value = urlValue as T;
+    }
+  }, []);
+
   useEffect(() => {
     return signalRef.current.subscribe(setValue);
   }, []);
 
-  // Update handler
   const setQueryValue = useCallback((newValue: T | ((prev: T) => T)) => {
     const nextValue = typeof newValue === 'function' 
       ? (newValue as (prev: T) => T)(signalRef.current.value)
@@ -94,7 +105,6 @@ function useQueryState<T extends ParamValue>(
     );
   }, [key]);
 
-  // Handle browser navigation
   useEffect(() => {
     const handleUrlChange = () => {
       const params = new URLSearchParams(window.location.search);
