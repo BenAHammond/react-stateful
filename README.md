@@ -1,4 +1,4 @@
-# react-stateful
+# @bhammond/react-stateful
 
 A lightweight React hook for syncing URL search parameters with state, built specifically for Next.js and other SSR frameworks. Zero dependencies, pure React, and seamless handling of both client and server-side rendering while maintaining URL state across page loads and navigation.
 
@@ -16,7 +16,7 @@ A lightweight React hook for syncing URL search parameters with state, built spe
 ## Installation
 
 ```bash
-npm install --save react-stateful
+npm install @bhammond/react-stateful
 ```
 
 ## Basic Usage
@@ -24,7 +24,7 @@ npm install --save react-stateful
 ### React with URLSearchParams
 
 ```typescript
-import { useQueryState, type URLParamsLike } from 'react-stateful';
+import { useQueryState, type URLParamsLike } from '@bhammond/react-stateful';
 
 function SearchComponent() {
   // URLSearchParams implements URLParamsLike
@@ -45,7 +45,7 @@ function SearchComponent() {
 
 ```typescript
 // app/page.tsx
-import { type RecordParams } from 'react-stateful';
+import { type RecordParams } from '@bhammond/react-stateful';
 
 export default async function Page({
   searchParams,
@@ -61,7 +61,7 @@ export default async function Page({
 // app/search-component.tsx
 'use client';
 
-import { useQueryState, type RecordParams } from 'react-stateful';
+import { useQueryState, type RecordParams } from '@bhammond/react-stateful';
 
 export default function SearchComponent({ 
   params 
@@ -86,7 +86,7 @@ export default function SearchComponent({
 'use client';
 
 import { useSearchParams } from 'next/navigation';
-import { useQueryState, type URLParamsLike } from 'react-stateful';
+import { useQueryState, type URLParamsLike } from '@bhammond/react-stateful';
 
 export default function SearchComponent() {
   const searchParams = useSearchParams();
