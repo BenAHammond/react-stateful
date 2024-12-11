@@ -60,7 +60,7 @@ function parseValue<T>(value: string | null, defaultValue?: T): T {
       const num = Number(decoded);
       return isNaN(num) ? decoded as T : num as T;
     }
-    if (decoded.startsWith('{') || decoded.startsWith('[')) {
+    if (decoded.length > 0 && (decoded[0] == '{' || decoded[0] == '[')) {
       try {
         return JSON.parse(decoded) as T;
       } catch {
