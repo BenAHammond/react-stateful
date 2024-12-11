@@ -10,7 +10,6 @@ export interface RecordParams {
 
 export type ParamsInput = URLParamsLike | RecordParams;
 
-// Type checking utilities
 function isNumber(value: any): value is number {
   return typeof value === 'number' && !isNaN(value);
 }
@@ -27,7 +26,6 @@ function isArray(value: any): value is any[] {
   return Array.isArray(value);
 }
 
-// Improved parsing with type checking
 function parseValue<T>(value: string | null, defaultValue?: T): T {
   try {
     if (value === null) return defaultValue as T;
@@ -150,27 +148,36 @@ function useQueryState<T = string>(
   }
 
   const key = encodeURIComponent(name);
-  const initialValue = parseValue<T>(getParam(params, key), defaultValue);
+  const paramValue = getParam(params, key);
+  const initialValue = parseValue<T>(paramValue, defaultValue);
+  
+  const [isInitialRender, setIsInitialRender] = useState(true);
   const signalRef = useRef(getSignal(key, initialValue));
-  const [value, setValue] = useState<T>(signalRef.current.value);
+  const [value, setValue] = useState<T>(initialValue);
+
+  useEffect(() => {
+    setIsInitialRender(false);
+  }, []);
 
   useEffect(() => {
     let mounted = true;
 
-    try {
-      const params = new URLSearchParams(window.location.search);
-      const urlValue = parseValue<T>(params.get(key), defaultValue);
-      if (mounted) {
-        signalRef.current.notify(urlValue);
+    if (!isInitialRender && typeof window !== 'undefined') {
+      try {
+        const params = new URLSearchParams(window.location.search);
+        const urlValue = parseValue<T>(params.get(key), defaultValue);
+        if (mounted) {
+          signalRef.current.notify(urlValue);
+        }
+      } catch (e) {
+        console.error('Error syncing with URL:', e);
       }
-    } catch (e) {
-      console.error('Error syncing with URL:', e);
     }
 
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [isInitialRender, key, defaultValue]);
 
   useEffect(() => {
     return signalRef.current.subscribe(setValue);
@@ -221,7 +228,7 @@ function useQueryState<T = string>(
 
   useDebugValue(value);
 
-  return [value, setQueryValue];
+  return [isInitialRender ? initialValue : value, setQueryValue];
 }
 
 export default useQueryState;
