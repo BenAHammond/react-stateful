@@ -1,17 +1,19 @@
 # @bhammond/react-stateful
 
-A lightweight React hook for syncing URL search parameters with state, built specifically for Next.js and other SSR frameworks. Zero dependencies, pure React, and seamless handling of both client and server-side rendering while maintaining URL state across page loads and navigation.
+Framework-agnostic URL-synchronized state management with built-in state sharing between components. Uses signals under the hood to efficiently share state without unnecessary re-renders.
+
+Looking for Next.js integration? Check out [react-stateful-next](https://github.com/yourusername/react-stateful-next)
 
 ## Features
 
-- ⚛️ First-class Next.js App Router support
-- 🔄 Full SSR compatibility with zero hydration issues
-- 🌐 Works with `searchParams` prop and `useSearchParams` hook
-- 🤝 Shares state between components using the same key
-- 🧭 Handles browser navigation (back/forward) automatically
+- ⚡️ Lightning-fast state sharing between components using signals
+- 🔄 Automatic URL synchronization with component state
+- 🌐 Works with any params object implementing `get(key)` method
+- 🧭 Handles browser navigation automatically
+- 🤝 Framework agnostic
 - 📦 TypeScript support out of the box
-- ⚡️ Zero dependencies - just React
 - 🪶 Tiny bundle size (~1KB minified + gzipped)
+- 💪 Zero dependencies
 
 ## Installation
 
@@ -19,15 +21,16 @@ A lightweight React hook for syncing URL search parameters with state, built spe
 npm install @bhammond/react-stateful
 ```
 
+### Requirements
+
+- React 16.8+
+
 ## Basic Usage
 
-### React with URLSearchParams
-
 ```typescript
-import { useQueryState, type URLParamsLike } from '@bhammond/react-stateful';
+import { useQueryState } from '@bhammond/react-stateful';
 
 function SearchComponent() {
-  // URLSearchParams implements URLParamsLike
   const params = new URLSearchParams(window.location.search);
   const [query, setQuery] = useQueryState('q', params);
 
@@ -41,65 +44,88 @@ function SearchComponent() {
 }
 ```
 
-### Next.js App Router
+## State Sharing Between Components
+
+One of the key features of react-stateful is efficient state sharing between components using signals. Components using the same key will automatically share state without unnecessary re-renders:
 
 ```typescript
-// app/page.tsx
-import { type RecordParams } from '@bhammond/react-stateful';
+import { useQueryState } from '@bhammond/react-stateful';
 
-export default async function Page({
-  searchParams,
-}: {
-  searchParams: RecordParams;
-}) {
-  // Important: In Next.js 15+, you must await params
-  const params = await Promise.resolve(searchParams);
-  
-  return <SearchComponent params={params} />;
+// These components will share state automatically
+function SearchInput({ params }) {
+  const [query, setQuery] = useQueryState('q', params);
+  return <input value={query ?? ''} onChange={e => setQuery(e.target.value)} />;
 }
 
-// app/search-component.tsx
-'use client';
+function SearchResults({ params }) {
+  // Uses the same signal as SearchInput - no prop drilling needed
+  const [query] = useQueryState('q', params);
+  return <div>Results for: {query}</div>;
+}
 
-import { useQueryState, type RecordParams } from '@bhammond/react-stateful';
+function FilterStatus({ params }) {
+  // Will update in sync with other components
+  const [query] = useQueryState('q', params);
+  return <div>Current filter: {query || 'None'}</div>;
+}
 
-export default function SearchComponent({ 
-  params 
-}: { 
-  params: RecordParams
-}) {
-  const [query, setQuery] = useQueryState('q', params);
-
+// Use them anywhere in your app - they'll stay in sync
+function SearchPage() {
+  const params = new URLSearchParams(window.location.search);
   return (
-    <input
-      value={query ?? ''}
-      onChange={(e) => setQuery(e.target.value)}
-      placeholder="Search..."
-    />
+    <div>
+      <SearchInput params={params} />
+      <FilterStatus params={params} />
+      <SearchResults params={params} />
+    </div>
   );
 }
 ```
 
-### Using useSearchParams (Client Components)
+## Complex Objects
+
+The hook handles complex objects automatically, maintaining type safety:
 
 ```typescript
-'use client';
+interface Filters {
+  search: string;
+  category: string;
+  sortBy: string;
+  page: number;
+}
 
-import { useSearchParams } from 'next/navigation';
-import { useQueryState, type URLParamsLike } from '@bhammond/react-stateful';
+const DEFAULT_FILTERS: Filters = {
+  search: '',
+  category: 'all',
+  sortBy: 'date',
+  page: 1
+};
 
-export default function SearchComponent() {
-  const searchParams = useSearchParams();
-  // Important: In Next.js 15+, you must await params
-  const params = await Promise.resolve(searchParams);
-  const [query, setQuery] = useQueryState('q', params);
+function FilterPanel({ params }) {
+  // Type-safe and shared between components
+  const [filters, setFilters] = useQueryState<Filters>('filters', params, DEFAULT_FILTERS);
+
+  const updateFilter = (key: keyof Filters, value: Filters[keyof Filters]) => {
+    setFilters(current => ({
+      ...current,
+      [key]: value,
+      page: key === 'page' ? value : 1
+    }));
+  };
 
   return (
-    <input
-      value={query ?? ''}
-      onChange={(e) => setQuery(e.target.value)}
-      placeholder="Search..."
-    />
+    <div>
+      <input
+        value={filters.search}
+        onChange={e => updateFilter('search', e.target.value)}
+      />
+      <select
+        value={filters.category}
+        onChange={e => updateFilter('category', e.target.value)}
+      >
+        {/* options */}
+      </select>
+    </div>
   );
 }
 ```
@@ -128,103 +154,60 @@ function useQueryState<T = string>(
 
 - `[value, setValue]` - A tuple containing the current value and setter function
 
-#### Type Parameters
+## How It Works
 
-- `T` - The type of the state value (defaults to string)
+1. When a component calls `useQueryState` with a key, it either creates a new signal or subscribes to an existing one
+2. Updates to the state are automatically synchronized with the URL
+3. Multiple components using the same key share the same signal, ensuring efficient updates
+4. Browser navigation (back/forward) is handled automatically
+5. Changes are batched and debounced for optimal performance
 
-## Advanced Examples
+## Framework Integration
 
-### Form with Default Value
+### React Router
 
 ```typescript
-function SearchForm({ params }: { params: ParamsInput }) {
-  const [query, setQuery] = useQueryState('q', params, '');
-  
+import { useSearchParams } from 'react-router-dom';
+import { useQueryState } from '@bhammond/react-stateful';
+
+function SearchComponent() {
+  const [searchParams] = useSearchParams();
+  const [query, setQuery] = useQueryState('q', searchParams);
+
   return (
-    <form onSubmit={e => e.preventDefault()}>
-      <input
-        value={query}
-        onChange={e => setQuery(e.target.value)}
-        placeholder="Search..."
-      />
-      <button onClick={() => setQuery('')}>Clear</button>
-    </form>
+    <input
+      value={query ?? ''}
+      onChange={(e) => setQuery(e.target.value)}
+    />
   );
 }
 ```
 
-### Complex Objects
+### Generic Usage
 
 ```typescript
-interface Filters {
-  search: string;
-  category: string;
-  sortBy: string;
-  page: number;
+class CustomParams implements URLParamsLike {
+  private params: Map<string, string>;
+
+  constructor() {
+    this.params = new Map();
+  }
+
+  get(key: string): string | null {
+    return this.params.get(key) ?? null;
+  }
+
+  set(key: string, value: string): void {
+    this.params.set(key, value);
+  }
 }
 
-const DEFAULT_FILTERS: Filters = {
-  search: '',
-  category: 'all',
-  sortBy: 'date',
-  page: 1
-};
-
-function FilterPanel({ params }: { params: ParamsInput }) {
-  const [filters, setFilters] = useQueryState<Filters>('filters', params, DEFAULT_FILTERS);
-
-  const updateFilter = (key: keyof Filters, value: Filters[keyof Filters]) => {
-    setFilters(current => ({
-      ...current,
-      [key]: value,
-      page: key === 'page' ? value : 1 // Reset page when other filters change
-    }));
-  };
-
-  return (
-    <div>
-      <input
-        value={filters.search}
-        onChange={e => updateFilter('search', e.target.value)}
-      />
-      <select
-        value={filters.category}
-        onChange={e => updateFilter('category', e.target.value)}
-      >
-        {/* options */}
-      </select>
-    </div>
-  );
+function Component() {
+  const params = new CustomParams();
+  const [value, setValue] = useQueryState('key', params);
+  // ...
 }
 ```
-
-### State Sharing Between Components
-
-```typescript
-function SearchInput({ params }: { params: ParamsInput }) {
-  const [query, setQuery] = useQueryState('q', params);
-  return <input value={query ?? ''} onChange={e => setQuery(e.target.value)} />;
-}
-
-function SearchResults({ params }: { params: ParamsInput }) {
-  const [query] = useQueryState('q', params);
-  return <div>Results for: {query}</div>;
-}
-
-function SearchPage({ params }: { params: ParamsInput }) {
-  return (
-    <div>
-      <SearchInput params={params} />
-      <SearchResults params={params} />
-    </div>
-  );
-}
-```
-
-## Browser Support
-
-- Modern browsers with URLSearchParams and History API support
-- No IE11 support
 
 ## TypeScript Support
 
@@ -232,10 +215,10 @@ Built with TypeScript and includes type definitions out of the box. Supports str
 
 ## Performance
 
-- Tiny bundle size
-- Efficient URL updates batched with RAF
-- Shared state management without additional re-renders
-- Zero dependencies
+- Uses signals for efficient state sharing
+- Minimal re-renders - only affected components update
+- URL updates are batched and debounced
+- Tiny bundle size with zero dependencies
 
 ## Contributing
 
