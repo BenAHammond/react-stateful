@@ -1,19 +1,16 @@
 # @bhammond/react-stateful
 
-Framework-agnostic URL-synchronized state management with built-in state sharing between components. Uses signals under the hood to efficiently share state without unnecessary re-renders.
-
-Looking for Next.js integration? Check out [react-stateful-next](https://github.com/yourusername/react-stateful-next)
+Framework-agnostic URL-synchronized state management with built-in state sharing between components. Uses signals to share state efficiently between components.
 
 ## Features
 
-- ⚡️ Lightning-fast state sharing between components using signals
-- 🔄 Automatic URL synchronization with component state
-- 🌐 Works with any params object implementing `get(key)` method
-- 🧭 Handles browser navigation automatically
-- 🤝 Framework agnostic
-- 📦 TypeScript support out of the box
-- 🪶 Tiny bundle size (~1KB minified + gzipped)
-- 💪 Zero dependencies
+- 🔄 State sharing between components using signals
+- 🌐 URL synchronization with component state
+- 🧭 Browser navigation (back/forward) support
+- 🤝 Framework agnostic design
+- 📦 TypeScript included
+- 🪶 Small bundle size (~1KB)
+- 💪 No dependencies
 
 ## Installation
 
@@ -46,30 +43,26 @@ function SearchComponent() {
 
 ## State Sharing Between Components
 
-One of the key features of react-stateful is efficient state sharing between components using signals. Components using the same key will automatically share state without unnecessary re-renders:
+Components using the same key will share state through signals:
 
 ```typescript
 import { useQueryState } from '@bhammond/react-stateful';
 
-// These components will share state automatically
 function SearchInput({ params }) {
   const [query, setQuery] = useQueryState('q', params);
   return <input value={query ?? ''} onChange={e => setQuery(e.target.value)} />;
 }
 
 function SearchResults({ params }) {
-  // Uses the same signal as SearchInput - no prop drilling needed
   const [query] = useQueryState('q', params);
   return <div>Results for: {query}</div>;
 }
 
 function FilterStatus({ params }) {
-  // Will update in sync with other components
   const [query] = useQueryState('q', params);
   return <div>Current filter: {query || 'None'}</div>;
 }
 
-// Use them anywhere in your app - they'll stay in sync
 function SearchPage() {
   const params = new URLSearchParams(window.location.search);
   return (
@@ -84,7 +77,7 @@ function SearchPage() {
 
 ## Complex Objects
 
-The hook handles complex objects automatically, maintaining type safety:
+The hook works with complex objects and maintains type safety:
 
 ```typescript
 interface Filters {
@@ -102,7 +95,6 @@ const DEFAULT_FILTERS: Filters = {
 };
 
 function FilterPanel({ params }) {
-  // Type-safe and shared between components
   const [filters, setFilters] = useQueryState<Filters>('filters', params, DEFAULT_FILTERS);
 
   const updateFilter = (key: keyof Filters, value: Filters[keyof Filters]) => {
@@ -154,14 +146,6 @@ function useQueryState<T = string>(
 
 - `[value, setValue]` - A tuple containing the current value and setter function
 
-## How It Works
-
-1. When a component calls `useQueryState` with a key, it either creates a new signal or subscribes to an existing one
-2. Updates to the state are automatically synchronized with the URL
-3. Multiple components using the same key share the same signal, ensuring efficient updates
-4. Browser navigation (back/forward) is handled automatically
-5. Changes are batched and debounced for optimal performance
-
 ## Framework Integration
 
 ### React Router
@@ -183,7 +167,7 @@ function SearchComponent() {
 }
 ```
 
-### Generic Usage
+### Custom Implementation
 
 ```typescript
 class CustomParams implements URLParamsLike {
@@ -211,18 +195,19 @@ function Component() {
 
 ## TypeScript Support
 
-Built with TypeScript and includes type definitions out of the box. Supports strict mode and provides full type inference for state values.
+Includes TypeScript definitions with full type inference support.
 
 ## Performance
 
-- Uses signals for efficient state sharing
-- Minimal re-renders - only affected components update
-- URL updates are batched and debounced
-- Tiny bundle size with zero dependencies
+- Signal-based state sharing
+- Selective component updates
+- Batched URL updates
+- Small bundle size
+- No external dependencies
 
 ## Contributing
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+Contributions are welcome. Please feel free to submit a Pull Request.
 
 ## License
 
