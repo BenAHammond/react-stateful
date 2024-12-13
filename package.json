@@ -1,6 +1,6 @@
 {
   "name": "@bhammond/react-stateful",
-  "version": "1.3.9",
+  "version": "1.3.10",
   "main": "dist/index.js",
   "scripts": {
     "build": "npx tsc"
@@ -25,7 +25,6 @@
     "react": "^16 || ^17 || ^18 || ^19"
   },
   "dependencies": {
-    "csstype": "^3.1.3"
   },
   "keywords": [
     "react",
