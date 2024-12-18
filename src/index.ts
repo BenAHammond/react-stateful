@@ -32,7 +32,6 @@ function parseValue<T>(value: string | null, defaultValue?: T): T {
     
     const decoded = decodeURIComponent(value);
 
-    // Handle different expected types based on defaultValue or type T
     if (defaultValue !== undefined) {
       if (isNumber(defaultValue)) {
         const num = Number(decoded);
@@ -51,14 +50,13 @@ function parseValue<T>(value: string | null, defaultValue?: T): T {
       }
     }
 
-    // Type inference without defaultValue
     if (decoded === 'true') return true as T;
     if (decoded === 'false') return false as T;
     if (/^\d+$/.test(decoded)) {
       const num = Number(decoded);
       return isNaN(num) ? decoded as T : num as T;
     }
-    if (decoded.length > 0 && (decoded[0] == '{' || decoded[0] == '[')) {
+    if (decoded.length > 0 && (decoded[0] === '{' || decoded[0] === '[')) {
       try {
         return JSON.parse(decoded) as T;
       } catch {
@@ -108,6 +106,7 @@ class Signal<T> {
   }
 
   notify(newValue: T) {
+    if (this.value === newValue) return;
     this.value = newValue;
     this.listeners.forEach(listener => {
       try {
@@ -151,67 +150,29 @@ function useQueryState<T = string>(
   const paramValue = getParam(params, key);
   const initialValue = parseValue<T>(paramValue, defaultValue);
   
-  const [isInitialRender, setIsInitialRender] = useState(true);
-  const signalRef = useRef(getSignal(key, initialValue));
   const [value, setValue] = useState<T>(initialValue);
+  const timeoutRef = useRef<number>(null);
+  const lastSearchRef = useRef(typeof window !== 'undefined' ? window.location.search : '');
+  const signalRef = useRef(getSignal(key, initialValue));
+  const isUpdatingRef = useRef(false);
 
   useEffect(() => {
-    setIsInitialRender(false);
-  }, []);
-
-  useEffect(() => {
-    let mounted = true;
-
-    if (!isInitialRender && typeof window !== 'undefined') {
-      try {
-        const params = new URLSearchParams(window.location.search);
-        const urlValue = parseValue<T>(params.get(key), defaultValue);
-        if (mounted) {
-          signalRef.current.notify(urlValue);
-        }
-      } catch (e) {
-        console.error('Error syncing with URL:', e);
+    return signalRef.current.subscribe((newValue) => {
+      if (!isUpdatingRef.current) {
+        setValue(newValue);
       }
-    }
-
-    return () => {
-      mounted = false;
-    };
-  }, [isInitialRender, key, defaultValue]);
-
-  useEffect(() => {
-    return signalRef.current.subscribe(setValue);
+    });
   }, []);
-
-  const setQueryValue = useCallback((newValue: T | ((prev: T) => T)) => {
-    try {
-      const nextValue = typeof newValue === 'function'
-        ? (newValue as Function)(signalRef.current.value)
-        : newValue;
-
-      signalRef.current.notify(nextValue);
-
-      if (typeof window !== 'undefined') {
-        const params = new URLSearchParams(window.location.search);
-        if (nextValue === null || nextValue === false || nextValue === '') {
-          params.delete(key);
-        } else {
-          params.set(key, encodeURIComponent(stringifyValue(nextValue)));
-        }
-
-        const newUrl = `${window.location.pathname}${params.toString() ? `?${params.toString()}` : ''}`;
-        window.history.pushState({}, '', newUrl);
-      }
-    } catch (e) {
-      console.error('Error updating query state:', e);
-    }
-  }, [key]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
     function handleUrlChange() {
       try {
+        if (window.location.search === lastSearchRef.current) return;
+        if (isUpdatingRef.current) return;
+        
+        lastSearchRef.current = window.location.search;
         const params = new URLSearchParams(window.location.search);
         const urlValue = parseValue<T>(params.get(key), defaultValue);
         signalRef.current.notify(urlValue);
@@ -226,9 +187,49 @@ function useQueryState<T = string>(
     };
   }, [key, defaultValue]);
 
+  const setQueryValue = useCallback((newValue: T | ((prev: T) => T)) => {
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+    }
+
+    timeoutRef.current = setTimeout(() => {
+      try {
+        isUpdatingRef.current = true;
+        const nextValue = typeof newValue === 'function'
+          ? (newValue as Function)(signalRef.current.value)
+          : newValue;
+
+        if (nextValue === signalRef.current.value) {
+          isUpdatingRef.current = false;
+          return;
+        }
+
+        signalRef.current.notify(nextValue);
+
+        if (typeof window !== 'undefined') {
+          const params = new URLSearchParams(window.location.search);
+          if (nextValue === null || nextValue === false || nextValue === '') {
+            params.delete(key);
+          } else {
+            params.set(key, encodeURIComponent(stringifyValue(nextValue)));
+          }
+
+          const newUrl = `${window.location.pathname}${params.toString() ? `?${params.toString()}` : ''}`;
+          lastSearchRef.current = params.toString();
+          window.history.pushState({}, '', newUrl);
+        }
+        
+        isUpdatingRef.current = false;
+      } catch (e) {
+        isUpdatingRef.current = false;
+        console.error('Error updating query state:', e);
+      }
+    }, 100);
+  }, [key]);
+
   useDebugValue(value);
 
-  return [isInitialRender ? initialValue : value, setQueryValue];
+  return [value, setQueryValue];
 }
 
 export default useQueryState;
