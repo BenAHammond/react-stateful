@@ -26,9 +26,9 @@ function isArray(value: any): value is any[] {
   return Array.isArray(value);
 }
 
-function parseValue<T>(value: string | null, defaultValue?: T): T {
+function parseValue<T>(value: string | null, defaultValue: T): T {
   try {
-    if (value === null) return defaultValue as T;
+    if (value === null) return defaultValue;
     
     const decoded = decodeURIComponent(value);
 
@@ -66,7 +66,7 @@ function parseValue<T>(value: string | null, defaultValue?: T): T {
     
     return decoded as T;
   } catch {
-    return defaultValue as T;
+    return defaultValue;
   }
 }
 
@@ -98,7 +98,7 @@ function getParam(params: ParamsInput, key: string): string | null {
 }
 
 class Signal<T> {
-  private listeners: ((value: T) => void)[] = [];
+  private listeners: Array<(value: T) => void> = [];
   value: T;
 
   constructor(value: T) {
@@ -136,11 +136,13 @@ function getSignal<T>(key: string, value: T): Signal<T> {
   return signal;
 }
 
-function useQueryState<T = string>(
+type SetStateAction<T> = T | ((prevState: T) => T);
+
+function useQueryState<T extends string>(
   name: string,
   params: ParamsInput,
-  defaultValue?: T
-): [T, (newValue: T | ((prev: T) => T)) => void] {
+  defaultValue: T
+): [T, (newValue: SetStateAction<T>) => void] {
   if (!name) {
     console.error('useQueryState requires a name parameter');
     name = 'unnamed';
@@ -151,13 +153,13 @@ function useQueryState<T = string>(
   const initialValue = parseValue<T>(paramValue, defaultValue);
   
   const [value, setValue] = useState<T>(initialValue);
-  const timeoutRef = useRef<number>(null);
+  const timeoutRef = useRef<number | null>(null);
   const lastSearchRef = useRef(typeof window !== 'undefined' ? window.location.search : '');
   const signalRef = useRef(getSignal(key, initialValue));
   const isUpdatingRef = useRef(false);
 
   useEffect(() => {
-    return signalRef.current.subscribe((newValue) => {
+    return signalRef.current.subscribe((newValue: T) => {
       if (!isUpdatingRef.current) {
         setValue(newValue);
       }
@@ -187,16 +189,16 @@ function useQueryState<T = string>(
     };
   }, [key, defaultValue]);
 
-  const setQueryValue = useCallback((newValue: T | ((prev: T) => T)) => {
-    if (timeoutRef.current) {
+  const setQueryValue = useCallback((newValue: SetStateAction<T>) => {
+    if (timeoutRef.current !== null) {
       clearTimeout(timeoutRef.current);
     }
 
-    timeoutRef.current = setTimeout(() => {
+    timeoutRef.current = window.setTimeout(() => {
       try {
         isUpdatingRef.current = true;
         const nextValue = typeof newValue === 'function'
-          ? (newValue as Function)(signalRef.current.value)
+          ? (newValue as (prev: T) => T)(signalRef.current.value)
           : newValue;
 
         if (nextValue === signalRef.current.value) {
@@ -208,7 +210,7 @@ function useQueryState<T = string>(
 
         if (typeof window !== 'undefined') {
           const params = new URLSearchParams(window.location.search);
-          if (nextValue === null || nextValue === false || nextValue === '') {
+          if (nextValue === null || !!nextValue === false || nextValue === '') {
             params.delete(key);
           } else {
             params.set(key, encodeURIComponent(stringifyValue(nextValue)));
